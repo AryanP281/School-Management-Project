@@ -31,4 +31,4 @@
 #ALTER TABLE attendance ADD CONSTRAINT unique_history UNIQUE(historyId,semester,MONTH);
 
 
-
+#INSERT INTO rubric(rubricName) VALUE ('__MEMB__');
