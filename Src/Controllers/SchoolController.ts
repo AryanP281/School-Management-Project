@@ -39,6 +39,46 @@ async function registerSchool(req:Request,resp:Response) : Promise<void>
     }
 }
 
+async function loginSchool(req:Request,resp:Response) : Promise<void>
+{
+    /*Logins in a school*/
+
+    try
+    {
+        const schoolCreds : {email:string,password:string} = req.body;
+        if(!schoolCreds.email || !schoolCreds.password || !schoolCreds.email.length || !schoolCreds.password.length)
+        {
+            resp.sendStatus(400);
+            return;
+        }
+
+        //Getting account password
+        const accountDetails : {id:BigInt,password:string} = (await dbPool.query("SELECT id,password FROM school WHERE loginEmail=?",[schoolCreds.email]))[0];
+        if(!accountDetails)
+        {
+            resp.status(200).json({success: false, code: responseCodes.doesntExist});
+            return;
+        }
+
+        //Comparing passwords
+        if(!(await compareHash(schoolCreds.password, accountDetails.password)))
+        {
+            resp.status(200).json({success:false, code:responseCodes.incorrectPassword});
+            return;
+        }
+
+        //Generating token
+        const token = generateToken({id:accountDetails.id.toString(), isAdmin:false});
+
+        resp.status(200).json({success: true, token});
+    }
+    catch(err)
+    {
+        console.log(err);
+        resp.sendStatus(500);
+    }
+}
+
 async function getAllSchools(req:Request,resp:Response) : Promise<void>
 {
     /*Returns all schools*/
@@ -180,7 +220,7 @@ async function getAllRubrics(req:Request,resp:Response) : Promise<void>
 }
 
 /************************Exports******************** */
-export {registerSchool, getAllSchools, addSubject, getAllSubjects, getAllRubrics};
+export {registerSchool, loginSchool, getAllSchools, addSubject, getAllSubjects, getAllRubrics};
 
 
 

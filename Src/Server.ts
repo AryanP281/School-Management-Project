@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import {initializeDatabase} from "./Config/MariadbConfig";
 import adminRouter from "./Api/AdminApi";
 import schoolRouter from "./Api/SchoolApi";
+import studentRouter from "./Api/StudentApi";
 
 /**************Variables******** */
 dotenv.config();
@@ -18,6 +19,7 @@ const expressApp : express.Application = express();
 expressApp.use(express.json());
 expressApp.use(express.urlencoded({extended: false}));
 expressApp.use(cors());
+expressApp.use("/pdf",express.static("Static"));
 
 //Server test route
 expressApp.use("/server/test",async (req : express.Request, resp : express.Response) => {
@@ -27,6 +29,8 @@ expressApp.use("/server/test",async (req : express.Request, resp : express.Respo
 //Setting up routes
 expressApp.use("/admin", adminRouter);
 expressApp.use("/school", schoolRouter);
+expressApp.use("/student", studentRouter);
+expressApp.use("/pdf",express.static(__dirname + "/Static"));
 
 //Starting express server
 expressApp.listen(SERVER_PORT, "0.0.0.0", () => console.log(`Express server started at port ${SERVER_PORT}`));

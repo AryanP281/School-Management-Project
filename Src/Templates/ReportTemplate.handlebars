@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+            }
+            .page {
+                width: 100vw;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .header {
+                flex-basis: 10%;
+                max-height: 10%;
+            }
+            .header-img {
+                max-height: 100%;
+                width: 100%;
+            }
+            .content {
+                flex-basis: 70%;
+                padding: 20px;
+            }
+            .report-grid {
+                margin-top: 10px;
+                display: grid;
+                grid-template-columns: repeat(4,1fr);
+                border: 1px solid black;
+            }
+            .report-grid h3 {
+                border: 1px solid black;
+                text-align: center;
+            }
+            .signs {
+                flex-basis: 10%;
+                padding: 40px;
+                display: flex;
+            }
+            .signs h3 {
+                flex: 1;
+                text-align: center;
+            }
+
+        </style>
+    </head>
+
+    <body>
+        <div class="page">
+            <header class="header" >
+               <img class="header-img" src="Header.png" />
+            </header>
+
+            <div class="content">
+                <div class="student-details">
+                    <p>Name: Aryan Pathare</p>
+                    <div style="display:flex; margin-top: 20px">
+                        <p style="flex: 1">Std: 10th</p>
+                        <p style="flex: 1">Div: C</p>
+                        <p style="flex: 1">Roll No: 25</p>
+                    </div>
+                </div>
+
+                <div class="report-grid">
+                    <h3>Subject</h3>
+                    <h3>Total</h3>
+                    <h3>Out Of</h3>
+                    <h3>Grade</h3>
+                    {{#each results}}
+                        <h3>{{subjectName}}</h3>
+                        <h3>{{total}}</h3>
+                        <h3>{{outOf}}</h3>
+                        <h3>{{grade}}</h3>
+                    {{/each}}
+                </div>
+            </div>
+            <div class="signs">
+                <h3>Signature Of Teacher</h3>
+                <h3>School Stamp</h3>
+                <h3>Date</h3>
+            </div>
+        </div>
+    </body>
+
+</html>
