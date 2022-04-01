@@ -46,6 +46,20 @@
   padding: 20px !important;
 }
 
+/************************School Home**********************/
+.school-menu {
+  padding: 10px;
+}
+
+.school-option {
+  background-color: #f44336;
+  color: white
+}
+
+.school-option-card:hover {
+  transform: scaleY(1.1);
+}
+
 /*********************Responsive Design******************/
 @media screen and (max-width: 750px) {
   .login-box {

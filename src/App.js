@@ -7,6 +7,8 @@ import SubjectManagement from "./Pages/SchoolSubjectManagement";
 import {red} from "@mui/material/colors";
 import StudentReportEntry from "./Pages/StudentReportEntry";
 import SubjectRubric from "./Pages/SubjectRubric";
+import { apiBaseUrl } from "./Config/AppConfig";
+import SchoolHome from "./Pages/SchoolHome";
 
 //Configuring the app theme
 const appTheme = createTheme({
@@ -21,7 +23,9 @@ function App() {
       <Router>
         <div className="App">
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/admin/login" element={<Login apiUrl={`${apiBaseUrl}/admin/login`}/>} />
+            <Route path="/school/login" element={<Login apiUrl={`${apiBaseUrl}/school/login`} />} />
+            <Route path="/home/school" element={<SchoolHome />}/>
             <Route path="/report/student" element={<ReportStudentSelection />} />
             <Route path="/school/subject" element={<SubjectManagement />} />
             <Route path="/report/student/:studentId" element={<StudentReportEntry />} />

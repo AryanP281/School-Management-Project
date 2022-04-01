@@ -11,7 +11,8 @@ const newSubjectSlice = createSlice({
         stds: [],
     },
     reducers: {
-        setSubjectDetails : setDetails
+        setSubjectDetails : setDetails,
+        resetSubjectDetails: reset
     }
 })
 
@@ -26,6 +27,14 @@ function setDetails(state, action)
     state.stds = details.stds;
 }
 
+function reset(state, action)
+{
+    state.schoolId = undefined;
+    state.schoolName = "";
+    state.subjectName = "";
+    state.stds = [];
+}
+
 /************************Exports************************* */
-export const {setSubjectDetails} = newSubjectSlice.actions;
+export const {setSubjectDetails, resetSubjectDetails} = newSubjectSlice.actions;
 export default newSubjectSlice.reducer;

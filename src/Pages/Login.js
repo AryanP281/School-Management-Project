@@ -7,10 +7,9 @@ import {responseCodes, apiBaseUrl} from "../Config/AppConfig";
 import { useNavigate } from "react-router-dom";
 
 /******************Variables****************** */
-const authApiUrl = `${apiBaseUrl}/admin/login`;
 
 /*******************Page********************* */
-function Login()
+function Login(props)
 {
     const [userCreds, setUserCreds] = useState({email:"",password:""});
     const [showAlert, setShowAlert] = useState(false);
@@ -24,7 +23,7 @@ function Login()
                 <Typography variant="h4" style={{alignSelf: "center"}}>Sign In</Typography><br/>
                 <form onSubmit={(e) => {
                     e.preventDefault();
-                    authenticate(userCreds, setShowAlert, setCredErrors, nav);
+                    authenticate(props.apiUrl,userCreds, setShowAlert, setCredErrors, nav);
                 }}>
                     <Stack spacing={2}>
                         <TextField variant="outlined" label="Login Id" fullWidth required 
@@ -60,13 +59,14 @@ function Login()
     );
 }
 
-async function authenticate(userCreds, setShowAlert, setCredErrors, nav)
+/******************Functions****************** */
+async function authenticate(apiUrl,userCreds, setShowAlert, setCredErrors, nav)
 {
     /*Logins the the admin */
 
     try
     {
-        const resp = await fetch(authApiUrl,{
+        const resp = await fetch(apiUrl,{
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
