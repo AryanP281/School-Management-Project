@@ -23,7 +23,7 @@ function Login(props)
                 <Typography variant="h4" style={{alignSelf: "center"}}>Sign In</Typography><br/>
                 <form onSubmit={(e) => {
                     e.preventDefault();
-                    authenticate(props.apiUrl,userCreds, setShowAlert, setCredErrors, nav);
+                    authenticate(props.apiUrl,userCreds, setShowAlert, setCredErrors, nav, props.isSchoolLogin);
                 }}>
                     <Stack spacing={2}>
                         <TextField variant="outlined" label="Login Id" fullWidth required 
@@ -60,7 +60,7 @@ function Login(props)
 }
 
 /******************Functions****************** */
-async function authenticate(apiUrl,userCreds, setShowAlert, setCredErrors, nav)
+async function authenticate(apiUrl,userCreds, setShowAlert, setCredErrors, nav, isSchoolLogin)
 {
     /*Logins the the admin */
 
@@ -91,7 +91,10 @@ async function authenticate(apiUrl,userCreds, setShowAlert, setCredErrors, nav)
 
         //Saving the token
         localStorage.setItem("token", data.token);
-        nav("/", {replace: true});
+        if(isSchoolLogin)
+            nav("/home/school", {replace: true});
+        else
+            nav("/home/admin", {replace: true});
     }
     catch(err)
     {

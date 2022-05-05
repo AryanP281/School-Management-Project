@@ -4,12 +4,14 @@ import {Paper,Stack,Autocomplete,TextField,Button,Dialog, DialogTitle, DialogCon
 import { DataGrid } from '@mui/x-data-grid';
 import { apiBaseUrl, apiHeader } from "../Config/AppConfig";
 import { useNavigate } from "react-router";
-import {resetSubjectDetails} from "../Redux/Slices/NewSubjectSlice";
+import {resetSubjectDetails, setSubjectStds} from "../Redux/Slices/NewSubjectSlice";
 import { useDispatch, useSelector } from "react-redux";
 
 /********************Variables**************** */
 const rubricListApiUrl = `${apiBaseUrl}/school/all/rubric`;
+const subjectRubricsApiUrl = `${apiBaseUrl}/school/subject/rubric`;
 const saveSubjectApiUrl = `${apiBaseUrl}/school/add/subject`;
+const saveSubjectChangesApiUrl = `${apiBaseUrl}/school/edit/subject`;
 
 /********************Page**************** */
 function SubjectRubric()
@@ -25,22 +27,27 @@ function SubjectRubric()
 
     useEffect(() => {
         getRubrics(setRubricList);
+        if(subjectDetails.subjectId)
+            loadSubjectRubrics(subjectDetails, setSelectedRubrics, dispatch);
     }, [])
     
     //Initializing the rubric rows and columns
     const gridCols = [{field:"std", headerName: "STD", flex:1}];
+    const gridRows = [];
     selectedRubrics.forEach((rubric) => {
         gridCols.push({field: rubric.name, headerName: rubric.name, flex:1, editable:true, type: "number", headerAlign:"center"});
     });
-    const gridRows = [];
     let row = null;
-    subjectDetails.stds.map((std, i) => {
-        row = {id: std, std};
-        selectedRubrics.forEach((rubric) => {
-            row[rubric.name] = rubric.totalMarks[i].mark;
+    if(subjectDetails.stds)
+    {
+        subjectDetails.stds.map((std, i) => {
+            row = {id: std, std};
+            selectedRubrics.forEach((rubric) => {
+                row[rubric.name] = rubric.totalMarks[i].mark;
+            });
+            gridRows.push(row)
         });
-        gridRows.push(row)
-    });
+    }
 
     //Editing cell values
     const editRubricValue = (row) => {
@@ -67,11 +74,16 @@ function SubjectRubric()
             <Stack spacing={2}>
                 <Typography variant="body1">School: {subjectDetails.schoolName}</Typography>
                 <Typography variant="body1">Subject: {subjectDetails.subjectName}</Typography>
-                <DataGrid rows={gridRows} columns={gridCols} pageSize={5} autoHeight
+                <DataGrid rows={gridRows} columns={gridCols} pageSize={3} autoHeight
                 onCellEditCommit={editRubricValue}/>
                 <Button onClick={() => setOpenDialog(true)}>Add Rubric</Button>
                 <Button variant="contained" style={{marginTop: 40}}
-                onClick={() => saveSubject(selectedRubrics, subjectDetails, setOpenLoadingDialog, navigate, dispatch)}
+                onClick={() => {
+                    if(!subjectDetails.subjectId)
+                        saveSubject(selectedRubrics, subjectDetails, setOpenLoadingDialog, navigate, dispatch);
+                    else
+                        saveSubjectChanges(selectedRubrics, subjectDetails, setOpenLoadingDialog, navigate, dispatch);
+                }}
                 >Save Subject</Button>
                 {openDialog && <RubricDialog openDialog={openDialog} setOpenDialog={setOpenDialog} stds={subjectDetails.stds} 
                 rubricList={rubricList} selectedRubrics={selectedRubrics} setSelectedRubrics={setSelectedRubrics} />}
@@ -131,6 +143,48 @@ function LoadingDialog()
 }
 
 /********************Functions**************** */
+async function loadSubjectRubrics(subjectDetails,setSelectedRubrics, dispatch)
+{
+    /*Gets list of the rubrics associated with the subject and their values */
+
+    try
+    {
+        const resp = await fetch(`${subjectRubricsApiUrl}?schoolId=${subjectDetails.schoolId}&subjectId=${subjectDetails.subjectId}`, {
+            method: "GET",
+            headers: apiHeader()
+        });
+        if(resp.status !== 200)
+            throw new Error(resp.status);
+
+        const data = await resp.json();
+
+        const stds = data.subjectRubrics.map((entry) => entry.std);
+        const rubricData = {};
+        stds.forEach((std, i) => {
+            data.subjectRubrics[i].rubrics.forEach((rb) => {
+                if(!rubricData[rb.rubricId])
+                    rubricData[rb.rubricId] = {name:rb.rubricName, totalMarks:[]};
+                rubricData[rb.rubricId].totalMarks.push({std:stds[i],mark:rb.totalMarks});
+            })
+        });
+
+        const selectedRubrics = [];
+        for(const [rubric,rubricValue] of Object.entries(rubricData))
+        {
+            selectedRubrics.push({name: rubricValue.name, totalMarks: rubricValue.totalMarks});
+        }
+
+        dispatch(setSubjectStds({stds:stds}));
+        setSelectedRubrics(selectedRubrics);
+    }
+    catch(err)
+    {
+        console.log(err);
+        //setToastError("Failed to load. Try again");
+        //setTimeout(() => setToastError(null), 2000);
+    }
+}
+
 async function getRubrics(setRubricList)
 {
     /*Gets list of all rubrics */
@@ -183,7 +237,39 @@ async function saveSubject(selectedRubrics, subjectDetails, setOpenLoadingDialog
 
         setOpenLoadingDialog(false);
         dispatch(resetSubjectDetails());
-        navigate("/school/subject", {replace: true});
+        navigate("/admin/school/subject", {replace: true});
+    }
+    catch(err)
+    {
+        console.log(err);
+        alert("Failed to save subject. Try again");
+    }
+}
+
+async function saveSubjectChanges(selectedRubrics, subjectDetails, setOpenLoadingDialog, navigate, dispatch)
+{
+    /*Saves the subject to the backend*/
+    
+    setOpenLoadingDialog(true);
+    const subject = {subjectId:subjectDetails.subjectId, schoolId: subjectDetails.schoolId, subject: subjectDetails.subjectName, rubrics: selectedRubrics};
+
+    try
+    {
+        const resp = await fetch(saveSubjectChangesApiUrl, {
+            method: "PUT",
+            headers: {
+                "Authorization" : localStorage.getItem("token"),
+                "Content-Type": "application/json"   
+            },
+            body: JSON.stringify({subjectDetails:subject})
+        });
+
+        if(resp.status !== 200)
+            throw Error(resp.status);
+
+        setOpenLoadingDialog(false);
+        dispatch(resetSubjectDetails());
+        navigate("/admin/school/subject", {replace: true});
     }
     catch(err)
     {
