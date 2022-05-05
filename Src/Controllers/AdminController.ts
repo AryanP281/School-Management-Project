@@ -8,6 +8,12 @@ import {compareHash, generateToken, hash} from "../Services/Crypto";
 /************************Controllers******************** */
 async function registerAdmin(req : Request, resp : Response) : Promise<void>
 {
+    if(!req.body.userDetails.isAdmin)
+    {
+        resp.sendStatus(403);
+        return;
+    }
+    
     try
     {
         //Getting and checking admin details

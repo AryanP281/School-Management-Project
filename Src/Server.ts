@@ -6,6 +6,7 @@ import {initializeDatabase} from "./Config/MariadbConfig";
 import adminRouter from "./Api/AdminApi";
 import schoolRouter from "./Api/SchoolApi";
 import studentRouter from "./Api/StudentApi";
+import {scheduleFileDeleteJob} from "./Config/AppConfig";
 
 /**************Variables******** */
 dotenv.config();
@@ -37,6 +38,9 @@ expressApp.listen(SERVER_PORT, "0.0.0.0", () => console.log(`Express server star
 
 //Initalizing database
 initializeDatabase();
+
+//Scheduling file delete job
+scheduleFileDeleteJob();
 
 /************************Exports******************** */
 export {JWT_SECRET};

@@ -13,8 +13,9 @@ async function generateStudentReport(req:Request, resp:Response) : Promise<void>
 {
     /*Generates student report pdf */
 
-    if(!req.query.studentId && !req.query.academicYear && !req.query.semester)
+    if(!req.query.studentId || !req.query.academicYear || !req.query.semester)
     {
+        console.log("Incorrect report query");
         resp.sendStatus(400);
         return;
     }
@@ -29,11 +30,18 @@ async function generateStudentReport(req:Request, resp:Response) : Promise<void>
         const historyId : BigInt | undefined = ((await dbPool!.query("SELECT id FROM studenthistory WHERE studentId=? AND academicYear=?", [studentId, academicYear]))[0]).id;
         if(!historyId)
         {
+            console.log("Incorrect studentId or academic Year");
             resp.sendStatus(400);
             return;
         }
-        const resultDetails  = (await dbPool!.query("SELECT subjectId, subjectName,SUM(marksObtained) AS total, SUM(totalMarks) AS outOf, SUM(marksObtained) * 100 / SUM(totalMarks) AS percentage FROM result R JOIN subjectstructure S ON R.subjStructId=S.id JOIN subject J ON J.id=S.subjectId  WHERE R.historyId=? AND R.semester=? GROUP BY subjectId ORDER BY subjectName;",[historyId,semester]))
+        const resultDetails  = (await dbPool!.query("SELECT subjectId, subjectName,SUM(marksObtained) AS total, SUM(totalMarks) AS outOf, SUM(marksObtained) * 100 / SUM(totalMarks) AS percentage FROM result R JOIN subjectstructure S ON R.subjStructId=S.id JOIN subject J ON J.id=S.subjectId  WHERE R.historyId=? AND R.semester=? GROUP BY subjectId ORDER BY J.id;",[historyId,semester]))
         delete resultDetails["meta"];
+        if(resultDetails.length === 0)
+        {
+            console.log("Incorrect studentId or academic Year");
+            resp.sendStatus(400);
+            return;
+        }
 
         //Calculating grades
         const percentages : number[] = resultDetails.map((res : any) => res.percentage);
@@ -132,5 +140,179 @@ function getGrades(percentages : number[]) : string[]
     return grades;
 }
 
+async function getStudentScores(req:Request,resp:Response) : Promise<void>
+{
+    /*Returns the scores of the given student*/
+
+    if(!req.params.id || !req.query.sem)
+    {
+        resp.sendStatus(400);
+        return;
+    }
+
+    if(!req.body.userDetails.isAdmin)
+    {
+        resp.sendStatus(403);
+        return;
+    }
+
+    try
+    {
+        const studentId : BigInt = BigInt(req.params.id);
+        const semester : number = parseInt(req.query.sem as string); 
+
+        //Getting student details
+        let sqlQuery = "SELECT S.schoolId,H.std,H.id AS historyId FROM student S, studenthistory H WHERE S.id=? AND H.studentId=S.id AND H.academicYear=(SELECT MAX(J.academicYear) FROM studenthistory J WHERE J.studentId=?)";
+        const studentDetails : any = (await dbPool.query(sqlQuery, [studentId,studentId]))[0];
+        if(!studentDetails)
+        {
+            resp.sendStatus(400);
+            return;
+        }
+
+        //Getting subjects and rubrics
+        sqlQuery = "SELECT S.id AS subjectId,S.subjectName,R.id AS rubricId,R.rubricName, T.totalMarks FROM subjectstructure T, subject S, rubric R WHERE S.id=T.subjectId AND R.id=T.rubricId AND T.schoolId=? AND T.std=? ORDER BY S.id,R.id";
+        const subjectDetails = (await dbPool.query(sqlQuery, [studentDetails.schoolId,studentDetails.std]));
+        delete subjectDetails.meta;
+        
+        const scores : {subjectId:BigInt,subjectName:string,rubrics:{rubricId:BigInt,rubricName:string,score:number,maxScore:number}[]}[] = [];
+        let currSubject : {subjectId:BigInt,subjectName:string,rubricId:BigInt,rubricName:string,totalMarks:number} = subjectDetails[0];
+        scores.push({subjectId:currSubject.subjectId,subjectName:currSubject.subjectName,rubrics:[{rubricId:currSubject.rubricId,rubricName:currSubject.rubricName,score:0,maxScore:currSubject.totalMarks}]});
+        for(let i = 1; i < subjectDetails.length; ++i)
+        {
+            currSubject = subjectDetails[i];
+            if(currSubject.subjectId !== scores[scores.length-1].subjectId)
+                scores.push({subjectId:currSubject.subjectId,subjectName:currSubject.subjectName,rubrics:[]});
+            scores[scores.length-1].rubrics.push({rubricId:currSubject.rubricId,rubricName:currSubject.rubricName,score:0,maxScore:currSubject.totalMarks});
+        }
+        
+        //Fetching student scores
+        sqlQuery = "SELECT S.subjectId,S.rubricId,R.marksObtained FROM result R,subjectstructure S WHERE S.id=R.subjStructId AND historyId=? AND semester=? ORDER BY S.subjectId,S.rubricId;";
+        const results = (await dbPool.query(sqlQuery, [studentDetails.historyId, semester]));
+        delete results.meta;
+        for(let i = 0, j = 0,k=0; i < results.length;)
+        {
+            if(scores[j].subjectId !== results[i].subjectId)
+            {
+                j++;
+                k = 0;
+                continue;
+            }
+            while(scores[j].rubrics[k].rubricId !== results[i].rubricId)
+            {
+                k++;
+            }
+            scores[j].rubrics[k].score = results[i].marksObtained;
+            i++;
+        }
+
+        resp.status(200).json({success:true, scores});
+    }
+    catch(err)
+    {
+        console.log(err);
+        resp.sendStatus(500);
+    }
+}
+
+async function editStudentScores(req : Request, resp : Response) : Promise<void>
+{
+    /*Edits the scores of the given student */
+
+    if(!req.body.changes || !req.body.studentId)
+    {
+        resp.sendStatus(400);
+        return;
+    }
+    
+    if(!req.body.userDetails.isAdmin)
+    {
+        resp.sendStatus(403);
+        return;
+    }
+
+    let dbConn : PoolConnection | null = null;
+    try
+    {
+        //Getting connection from pool
+        dbConn = await dbPool.getConnection();
+        
+        //Getting student history
+        const studentHistory = (await dbConn!.query("SELECT H.id, H.std, S.schoolId FROM studenthistory H, student S WHERE H.studentId=S.id AND S.id=? AND H.academicYear=(SELECT MAX(J.academicYear) FROM studenthistory J WHERE J.studentId=?)", [req.body.studentId, req.body.studentId]))[0];
+        if(!studentHistory)
+        {
+            resp.sendStatus(400);
+            return;
+        }
+
+        let sqlQueryArray : string[] = ("SELECT id,subjectId,rubricId FROM subjectstructure WHERE schoolId=? AND std=? AND subjectId IN (").split(" ");
+        let params : number[] = [studentHistory.schoolId, studentHistory.std];
+        for(const [sem,semValue] of Object.entries(req.body.changes))
+        {
+            for(const [subject,subjectValue] of Object.entries(semValue as any))
+            {
+                sqlQueryArray.push("?");
+                sqlQueryArray.push(",");
+                params.push((subjectValue as any).subjectId);
+            }
+        }
+        sqlQueryArray.pop();
+        sqlQueryArray.push(") ORDER BY subjectId");
+        const subjStructIds = (await dbConn!.query(sqlQueryArray.join(" "), params));
+        delete subjStructIds["meta"];
+        if(subjStructIds.length === 0)
+        {
+            resp.sendStatus(400);
+            return;
+        }
+        
+        const subjectRubricMap : any = {};
+        let subjId : number = parseInt(subjStructIds[0].subjectId);
+        subjectRubricMap[subjId] = {};
+        subjectRubricMap[subjId][subjStructIds[0].rubricId] = subjStructIds[0].id;
+        for(let i = 1; i < subjStructIds.length; ++i)
+        {
+            subjId = parseInt(subjStructIds[i].subjectId);
+            if(subjStructIds[i].subjectId !== subjStructIds[i-1].subjectId)
+                subjectRubricMap[subjId] = {};
+            subjectRubricMap[subjId][subjStructIds[i].rubricId] = subjStructIds[i].id;
+        }
+
+        //Starting the transaction
+        await dbConn!.beginTransaction()
+
+        for(let i = 0; i < Object.keys(req.body.changes).length; ++i)
+        {
+            const sem = parseInt(Object.keys(req.body.changes)[i]);
+            const semValue : any[] = req.body.changes[sem];
+            for(let j = 0; j < semValue.length; ++j)
+            {
+                const subjId : number = parseInt(semValue[j].subjectId);
+                for(const [rubric, rubricValue] of Object.entries(semValue[j].rubrics))
+                {
+                    await dbConn!.query("INSERT INTO result(historyId,subjStructId,semester,marksObtained) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE marksObtained=?", [studentHistory.id, subjectRubricMap[subjId][rubric], sem, rubricValue as number, rubricValue as number]); 
+                }
+            }
+        }
+
+        //Committing the transaction
+        await dbConn!.commit();
+
+        resp.status(200).json({success: true})
+    }
+    catch(err)
+    {
+        console.log(err);
+        resp.sendStatus(500);
+
+        //Rolling back
+        await dbConn?.rollback();
+    }
+    finally
+    {
+        await dbConn?.release();
+    }
+}
+
 /************************Exports******************** */
-export {generateStudentReport};
+export {generateStudentReport, getStudentScores, editStudentScores};
